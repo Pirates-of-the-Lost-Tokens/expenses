@@ -1,0 +1,93 @@
+import Dexie, { type EntityTable } from 'dexie'
+import type { Extra, Payment, Vendor } from './types.ts'
+
+const db = new Dexie('marriage-expenses') as Dexie & {
+  vendors: EntityTable<Vendor, 'id'>
+}
+
+db.version(1).stores({
+  vendors: 'id, name, category',
+})
+
+export function newId(): string {
+  return crypto.randomUUID()
+}
+
+export function today(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
+export async function listVendors(): Promise<Vendor[]> {
+  const vendors = await db.vendors.toArray()
+  return vendors.sort((a, b) => a.name.localeCompare(b.name))
+}
+
+export async function addVendor(input: {
+  name: string
+  category: string
+  quotedAmount: number
+}): Promise<string> {
+  const id = newId()
+  await db.vendors.add({
+    id,
+    name: input.name.trim(),
+    category: input.category.trim() || 'Other',
+    quotedAmount: input.quotedAmount,
+    extras: [],
+    payments: [],
+    notes: '',
+  })
+  return id
+}
+
+export async function updateVendor(
+  id: string,
+  patch: Partial<Pick<Vendor, 'name' | 'category' | 'quotedAmount' | 'notes'>>,
+): Promise<void> {
+  await db.vendors.update(id, patch)
+}
+
+export async function deleteVendor(id: string): Promise<void> {
+  await db.vendors.delete(id)
+}
+
+export async function addExtra(
+  vendorId: string,
+  extra: Omit<Extra, 'id'>,
+): Promise<void> {
+  const vendor = await db.vendors.get(vendorId)
+  if (!vendor) return
+  await db.vendors.update(vendorId, {
+    extras: [...vendor.extras, { ...extra, id: newId() }],
+  })
+}
+
+export async function deleteExtra(vendorId: string, extraId: string): Promise<void> {
+  const vendor = await db.vendors.get(vendorId)
+  if (!vendor) return
+  await db.vendors.update(vendorId, {
+    extras: vendor.extras.filter((extra) => extra.id !== extraId),
+  })
+}
+
+export async function addPayment(
+  vendorId: string,
+  payment: Omit<Payment, 'id'>,
+): Promise<void> {
+  const vendor = await db.vendors.get(vendorId)
+  if (!vendor) return
+  await db.vendors.update(vendorId, {
+    payments: [...vendor.payments, { ...payment, id: newId() }],
+  })
+}
+
+export async function deletePayment(
+  vendorId: string,
+  paymentId: string,
+): Promise<void> {
+  const vendor = await db.vendors.get(vendorId)
+  if (!vendor) return
+  await db.vendors.update(vendorId, {
+    payments: vendor.payments.filter((payment) => payment.id !== paymentId),
+  })
+}
