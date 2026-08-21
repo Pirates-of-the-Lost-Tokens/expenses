@@ -3,11 +3,14 @@ import {
   addDiscount,
   addExtra,
   addPayment,
+  addReceipt,
   addVendor,
   deleteDiscount,
   deleteExtra,
   deletePayment,
+  deleteReceipt,
   deleteVendor,
+  listReceipts,
   listVendors,
   today,
   updateVendor,
@@ -15,10 +18,17 @@ import {
 import {
   dashboardTotals,
   formatInr,
+  fundsPosition,
   quotedTotal,
+  receivedTotal,
   totalsFor,
 } from './compute.ts'
-import { CATEGORIES, type Vendor, type VendorStatus } from './types.ts'
+import {
+  CATEGORIES,
+  type Receipt,
+  type Vendor,
+  type VendorStatus,
+} from './types.ts'
 import './styles.css'
 
 function parseAmount(value: string): number {
@@ -34,7 +44,9 @@ const statusLabel: Record<VendorStatus, string> = {
 }
 
 export default function App() {
+  const [tab, setTab] = useState<'expenses' | 'funds'>('expenses')
   const [vendors, setVendors] = useState<Vendor[]>([])
+  const [receipts, setReceipts] = useState<Receipt[]>([])
   const [openId, setOpenId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -43,8 +55,17 @@ export default function App() {
   const [customCategory, setCustomCategory] = useState('')
   const [quoted, setQuoted] = useState('')
 
+  const [fundAmount, setFundAmount] = useState('')
+  const [fundDate, setFundDate] = useState(today())
+  const [fundNote, setFundNote] = useState('')
+
   const reload = useCallback(async () => {
-    setVendors(await listVendors())
+    const [nextVendors, nextReceipts] = await Promise.all([
+      listVendors(),
+      listReceipts(),
+    ])
+    setVendors(nextVendors)
+    setReceipts(nextReceipts)
   }, [])
 
   useEffect(() => {
@@ -78,8 +99,29 @@ export default function App() {
     await reload()
   }
 
+  async function onAddReceipt(event: FormEvent) {
+    event.preventDefault()
+    const amount = parseAmount(fundAmount)
+    if (amount <= 0) return
+    await addReceipt({
+      amount,
+      date: fundDate,
+      note: fundNote.trim() || undefined,
+    })
+    setFundAmount('')
+    setFundNote('')
+    setFundDate(today())
+    await reload()
+  }
+
   const dash = dashboardTotals(vendors)
   const quotedSum = quotedTotal(vendors)
+  const received = receivedTotal(receipts)
+  const { surplusOrDeficit, cashLeft } = fundsPosition(
+    received,
+    dash.finalAmount,
+    dash.paid,
+  )
   const open = vendors.find((vendor) => vendor.id === openId) ?? null
 
   return (
@@ -88,134 +130,227 @@ export default function App() {
         <p className="eyebrow">Household ledger</p>
         <h1>Marriage expenses</h1>
         <p className="lede">
-          Quoted, extras, discounts, and advances stay in this browser. Nothing
-          is sent anywhere.
+          Vendors and funds stay in this browser. Nothing is sent anywhere.
         </p>
       </header>
 
-      <section className="summary" aria-label="Totals">
-        <SummaryTile label="Quoted" value={formatInr(quotedSum)} />
-        <SummaryTile label="Extras" value={formatInr(dash.extrasTotal)} />
-        <SummaryTile label="Discounts" value={formatInr(dash.discountTotal)} />
-        <SummaryTile label="Final" value={formatInr(dash.finalAmount)} />
-        <SummaryTile label="Paid" value={formatInr(dash.paid)} />
-        <SummaryTile
-          label="Remaining"
-          value={formatInr(dash.remaining)}
-          emphasize
-        />
-      </section>
+      <nav className="tabs" aria-label="Views">
+        <button
+          type="button"
+          className={tab === 'expenses' ? 'tab active' : 'tab'}
+          onClick={() => setTab('expenses')}
+        >
+          Expenses
+        </button>
+        <button
+          type="button"
+          className={tab === 'funds' ? 'tab active' : 'tab'}
+          onClick={() => setTab('funds')}
+        >
+          Funds
+        </button>
+      </nav>
 
-      <form className="add-vendor" onSubmit={onAddVendor}>
-        <h2>Add vendor</h2>
-        {error ? <p className="error">{error}</p> : null}
-        <div className="fields">
-          <label>
-            Name
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Hall, caterer, jeweler…"
-              autoComplete="off"
+      {tab === 'expenses' ? (
+        <>
+          <section className="summary" aria-label="Expense totals">
+            <SummaryTile label="Quoted" value={formatInr(quotedSum)} />
+            <SummaryTile label="Extras" value={formatInr(dash.extrasTotal)} />
+            <SummaryTile
+              label="Discounts"
+              value={formatInr(dash.discountTotal)}
             />
-          </label>
-          <label>
-            Category
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-            >
-              {CATEGORIES.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-              <option value="__custom">Other (type it)</option>
-            </select>
-          </label>
-          {category === '__custom' ? (
-            <label>
-              Custom category
-              <input
-                value={customCategory}
-                onChange={(e) => setCustomCategory(e.target.value)}
-                placeholder="Mehndi, pandit…"
-              />
-            </label>
-          ) : null}
-          <label>
-            Quoted
-            <input
-              inputMode="decimal"
-              value={quoted}
-              onChange={(e) => setQuoted(e.target.value)}
-              placeholder="0"
+            <SummaryTile label="Final" value={formatInr(dash.finalAmount)} />
+            <SummaryTile label="Paid" value={formatInr(dash.paid)} />
+            <SummaryTile
+              label="Remaining"
+              value={formatInr(dash.remaining)}
+              emphasize
             />
-          </label>
-          <button type="submit">Add vendor</button>
-        </div>
-      </form>
+          </section>
 
-      {vendors.length === 0 ? (
-        <p className="empty">
-          No vendors yet. Add the first booking — hall, clothes, or catering —
-          to start the ledger.
-        </p>
-      ) : (
-        <div className="table-wrap">
-          <table className="ledger">
-            <thead>
-              <tr>
-                <th>Vendor</th>
-                <th>Category</th>
-                <th className="num">Quoted</th>
-                <th className="num">Extras</th>
-                <th className="num">Discounts</th>
-                <th className="num">Paid</th>
-                <th className="num">Remaining</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {vendors.map((vendor) => {
-                const t = totalsFor(vendor)
-                const isOpen = vendor.id === openId
-                return (
-                  <tr
-                    key={vendor.id}
-                    className={isOpen ? 'open' : undefined}
-                    onClick={() =>
-                      setOpenId(isOpen ? null : vendor.id)
-                    }
-                  >
-                    <td>{vendor.name}</td>
-                    <td>{vendor.category}</td>
-                    <td className="num">{formatInr(vendor.quotedAmount)}</td>
-                    <td className="num">{formatInr(t.extrasTotal)}</td>
-                    <td className="num">{formatInr(t.discountTotal)}</td>
-                    <td className="num">{formatInr(t.paid)}</td>
-                    <td className="num remaining">{formatInr(t.remaining)}</td>
-                    <td>
-                      <span className={`stamp ${t.status}`}>
-                        {statusLabel[t.status]}
-                      </span>
-                    </td>
+          <form className="add-vendor" onSubmit={onAddVendor}>
+            <h2>Add vendor</h2>
+            {error ? <p className="error">{error}</p> : null}
+            <div className="fields">
+              <label>
+                Name
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Hall, caterer, jeweler…"
+                  autoComplete="off"
+                />
+              </label>
+              <label>
+                Category
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                >
+                  {CATEGORIES.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                  <option value="__custom">Other (type it)</option>
+                </select>
+              </label>
+              {category === '__custom' ? (
+                <label>
+                  Custom category
+                  <input
+                    value={customCategory}
+                    onChange={(e) => setCustomCategory(e.target.value)}
+                    placeholder="Mehndi, pandit…"
+                  />
+                </label>
+              ) : null}
+              <label>
+                Quoted
+                <input
+                  inputMode="decimal"
+                  value={quoted}
+                  onChange={(e) => setQuoted(e.target.value)}
+                  placeholder="0"
+                />
+              </label>
+              <button type="submit">Add vendor</button>
+            </div>
+          </form>
+
+          {vendors.length === 0 ? (
+            <p className="empty">
+              No vendors yet. Add the first booking — hall, clothes, or catering
+              — to start the ledger.
+            </p>
+          ) : (
+            <div className="table-wrap">
+              <table className="ledger">
+                <thead>
+                  <tr>
+                    <th>Vendor</th>
+                    <th>Category</th>
+                    <th className="num">Quoted</th>
+                    <th className="num">Extras</th>
+                    <th className="num">Discounts</th>
+                    <th className="num">Paid</th>
+                    <th className="num">Remaining</th>
+                    <th>Status</th>
                   </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+                </thead>
+                <tbody>
+                  {vendors.map((vendor) => {
+                    const t = totalsFor(vendor)
+                    const isOpen = vendor.id === openId
+                    return (
+                      <tr
+                        key={vendor.id}
+                        className={isOpen ? 'open' : undefined}
+                        onClick={() => setOpenId(isOpen ? null : vendor.id)}
+                      >
+                        <td>{vendor.name}</td>
+                        <td>{vendor.category}</td>
+                        <td className="num">
+                          {formatInr(vendor.quotedAmount)}
+                        </td>
+                        <td className="num">{formatInr(t.extrasTotal)}</td>
+                        <td className="num">{formatInr(t.discountTotal)}</td>
+                        <td className="num">{formatInr(t.paid)}</td>
+                        <td className="num remaining">
+                          {formatInr(t.remaining)}
+                        </td>
+                        <td>
+                          <span className={`stamp ${t.status}`}>
+                            {statusLabel[t.status]}
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
 
-      {open ? (
-        <VendorPanel
-          key={open.id}
-          vendor={open}
-          onChange={reload}
-          onClose={() => setOpenId(null)}
-        />
-      ) : null}
+          {open ? (
+            <VendorPanel
+              key={open.id}
+              vendor={open}
+              onChange={reload}
+              onClose={() => setOpenId(null)}
+            />
+          ) : null}
+        </>
+      ) : (
+        <>
+          <section className="summary" aria-label="Funds totals">
+            <SummaryTile label="Received" value={formatInr(received)} />
+            <SummaryTile label="Final cost" value={formatInr(dash.finalAmount)} />
+            <SummaryTile label="Paid out" value={formatInr(dash.paid)} />
+            <SummaryTile label="Cash left" value={formatInr(cashLeft)} />
+            <SummaryTile
+              label={surplusOrDeficit >= 0 ? 'Surplus' : 'Deficit'}
+              value={formatInr(surplusOrDeficit)}
+              emphasize
+              tone={surplusOrDeficit >= 0 ? 'surplus' : 'deficit'}
+            />
+          </section>
+
+          <section className="funds" aria-label="Funds in">
+            <h2>Funds in</h2>
+            <p className="muted funds-hint">
+              Add each lot you receive (e.g. 200000 for 2L). Surplus or deficit
+              is received minus final cost.
+            </p>
+            {receipts.length === 0 ? (
+              <p className="muted">No funds recorded yet.</p>
+            ) : (
+              <ul className="lines">
+                {receipts.map((receipt) => (
+                  <li key={receipt.id}>
+                    <span>
+                      <strong>{formatInr(receipt.amount)}</strong>
+                      <em>
+                        {receipt.date}
+                        {receipt.note ? ` · ${receipt.note}` : ''}
+                      </em>
+                    </span>
+                    <button
+                      type="button"
+                      className="text"
+                      onClick={() =>
+                        void deleteReceipt(receipt.id).then(reload)
+                      }
+                    >
+                      Remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <form className="inline funds-form" onSubmit={onAddReceipt}>
+              <input
+                inputMode="decimal"
+                value={fundAmount}
+                onChange={(e) => setFundAmount(e.target.value)}
+                placeholder="Amount (₹)"
+              />
+              <input
+                type="date"
+                value={fundDate}
+                onChange={(e) => setFundDate(e.target.value)}
+              />
+              <input
+                value={fundNote}
+                onChange={(e) => setFundNote(e.target.value)}
+                placeholder="Source (optional)"
+              />
+              <button type="submit">Add funds</button>
+            </form>
+          </section>
+        </>
+      )}
     </div>
   )
 }
@@ -224,13 +359,23 @@ function SummaryTile({
   label,
   value,
   emphasize,
+  tone,
 }: {
   label: string
   value: string
   emphasize?: boolean
+  tone?: 'surplus' | 'deficit'
 }) {
+  const classes = [
+    'tile',
+    emphasize ? 'emphasize' : '',
+    tone === 'surplus' ? 'tone-surplus' : '',
+    tone === 'deficit' ? 'tone-deficit' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
   return (
-    <div className={emphasize ? 'tile emphasize' : 'tile'}>
+    <div className={classes}>
       <span className="tile-label">{label}</span>
       <span className="tile-value">{value}</span>
     </div>

@@ -76,11 +76,34 @@ button {
   color: var(--muted);
 }
 
+.tabs {
+  display: flex;
+  gap: 0.4rem;
+  margin: 1.4rem 0 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.tab {
+  padding: 0.55rem 0.95rem;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.tab.active {
+  background: var(--card);
+  border-color: var(--line);
+  color: var(--ink);
+  margin-bottom: -1px;
+}
+
 .summary {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
   gap: 0.7rem;
-  margin: 1.8rem 0 1.4rem;
+  margin: 1.2rem 0 1.4rem;
 }
 
 .tile {
@@ -90,6 +113,16 @@ button {
 }
 
 .tile.emphasize {
+  border-color: var(--vermillion);
+  background: #fff7f4;
+}
+
+.tile.tone-surplus {
+  border-color: var(--sage);
+  background: #eef5f0;
+}
+
+.tile.tone-deficit {
   border-color: var(--vermillion);
   background: #fff7f4;
 }
@@ -110,13 +143,27 @@ button {
 }
 
 .add-vendor,
+.funds,
 .panel {
   padding: 1.1rem 1.15rem 1.2rem;
   border: 1px solid var(--line);
   background: var(--card);
 }
 
+.funds {
+  margin-bottom: 0;
+}
+
+.funds-hint {
+  margin: 0 0 0.75rem;
+}
+
+.funds-form {
+  margin-top: 0.75rem;
+}
+
 .add-vendor h2,
+.funds h2,
 .panel h2,
 .panel h3 {
   margin: 0 0 0.75rem;
@@ -369,7 +416,8 @@ button.danger {
   .fields,
   .split,
   .panel-grid,
-  .inline {
+  .inline,
+  .funds-form {
     grid-template-columns: 1fr;
   }
 

@@ -1,4 +1,4 @@
-import type { Vendor, VendorStatus, VendorTotals } from './types.ts'
+import type { Receipt, Vendor, VendorStatus, VendorTotals } from './types.ts'
 
 const inr = new Intl.NumberFormat('en-IN', {
   style: 'currency',
@@ -59,4 +59,15 @@ export function dashboardTotals(vendors: Vendor[]): Omit<VendorTotals, 'status'>
 
 export function quotedTotal(vendors: Vendor[]): number {
   return vendors.reduce((sum, vendor) => sum + vendor.quotedAmount, 0)
+}
+
+export function receivedTotal(receipts: Receipt[]): number {
+  return receipts.reduce((sum, receipt) => sum + receipt.amount, 0)
+}
+
+export function fundsPosition(received: number, finalAmount: number, paid: number) {
+  return {
+    surplusOrDeficit: received - finalAmount,
+    cashLeft: received - paid,
+  }
 }

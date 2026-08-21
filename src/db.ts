@@ -1,12 +1,18 @@
 import Dexie, { type EntityTable } from 'dexie'
-import type { Discount, Extra, Payment, Vendor } from './types.ts'
+import type { Discount, Extra, Payment, Receipt, Vendor } from './types.ts'
 
 const db = new Dexie('marriage-expenses') as Dexie & {
   vendors: EntityTable<Vendor, 'id'>
+  receipts: EntityTable<Receipt, 'id'>
 }
 
 db.version(1).stores({
   vendors: 'id, name, category',
+})
+
+db.version(2).stores({
+  vendors: 'id, name, category',
+  receipts: 'id, date',
 })
 
 export function newId(): string {
@@ -127,4 +133,29 @@ export async function deletePayment(
   await db.vendors.update(vendorId, {
     payments: vendor.payments.filter((payment) => payment.id !== paymentId),
   })
+}
+
+export async function listReceipts(): Promise<Receipt[]> {
+  const receipts = await db.receipts.toArray()
+  return receipts.sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id))
+}
+
+export async function addReceipt(input: {
+  amount: number
+  date: string
+  note?: string
+}): Promise<string> {
+  const id = newId()
+  const note = input.note?.trim()
+  await db.receipts.add({
+    id,
+    amount: input.amount,
+    date: input.date,
+    ...(note ? { note } : {}),
+  })
+  return id
+}
+
+export async function deleteReceipt(id: string): Promise<void> {
+  await db.receipts.delete(id)
 }

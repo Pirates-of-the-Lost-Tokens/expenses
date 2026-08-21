@@ -19,6 +19,13 @@ export type Discount = {
   description?: string
 }
 
+export type Receipt = {
+  id: string
+  amount: number
+  date: string
+  note?: string
+}
+
 export type Vendor = {
   id: string
   name: string
