@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import {
+  addDiscount,
   addExtra,
   addPayment,
   addVendor,
+  deleteDiscount,
   deleteExtra,
   deletePayment,
   deleteVendor,
@@ -86,14 +88,15 @@ export default function App() {
         <p className="eyebrow">Household ledger</p>
         <h1>Marriage expenses</h1>
         <p className="lede">
-          Quoted, extras, and advances stay in this browser. Nothing is sent
-          anywhere.
+          Quoted, extras, discounts, and advances stay in this browser. Nothing
+          is sent anywhere.
         </p>
       </header>
 
       <section className="summary" aria-label="Totals">
         <SummaryTile label="Quoted" value={formatInr(quotedSum)} />
         <SummaryTile label="Extras" value={formatInr(dash.extrasTotal)} />
+        <SummaryTile label="Discounts" value={formatInr(dash.discountTotal)} />
         <SummaryTile label="Final" value={formatInr(dash.finalAmount)} />
         <SummaryTile label="Paid" value={formatInr(dash.paid)} />
         <SummaryTile
@@ -167,6 +170,7 @@ export default function App() {
                 <th>Category</th>
                 <th className="num">Quoted</th>
                 <th className="num">Extras</th>
+                <th className="num">Discounts</th>
                 <th className="num">Paid</th>
                 <th className="num">Remaining</th>
                 <th>Status</th>
@@ -188,6 +192,7 @@ export default function App() {
                     <td>{vendor.category}</td>
                     <td className="num">{formatInr(vendor.quotedAmount)}</td>
                     <td className="num">{formatInr(t.extrasTotal)}</td>
+                    <td className="num">{formatInr(t.discountTotal)}</td>
                     <td className="num">{formatInr(t.paid)}</td>
                     <td className="num remaining">{formatInr(t.remaining)}</td>
                     <td>
@@ -247,6 +252,8 @@ function VendorPanel({
   const [extraDesc, setExtraDesc] = useState('')
   const [extraAmount, setExtraAmount] = useState('')
   const [extraDate, setExtraDate] = useState(today())
+  const [discountAmount, setDiscountAmount] = useState('')
+  const [discountDate, setDiscountDate] = useState(today())
   const [payAmount, setPayAmount] = useState('')
   const [payDate, setPayDate] = useState(today())
   const [payNote, setPayNote] = useState('')
@@ -271,6 +278,17 @@ function VendorPanel({
     setExtraDesc('')
     setExtraAmount('')
     setExtraDate(today())
+    await onChange()
+  }
+
+  async function onAddDiscount(event: FormEvent) {
+    event.preventDefault()
+    await addDiscount(vendor.id, {
+      amount: parseAmount(discountAmount),
+      date: discountDate,
+    })
+    setDiscountAmount('')
+    setDiscountDate(today())
     await onChange()
   }
 
@@ -316,6 +334,10 @@ function VendorPanel({
           <dd>{formatInr(t.extrasTotal)}</dd>
         </div>
         <div>
+          <dt>Discounts</dt>
+          <dd>{formatInr(t.discountTotal)}</dd>
+        </div>
+        <div>
           <dt>Final</dt>
           <dd>{formatInr(t.finalAmount)}</dd>
         </div>
@@ -352,7 +374,8 @@ function VendorPanel({
       </div>
 
       <div className="split">
-        <div>
+        <div className="stack">
+          <div>
           <h3>Extras</h3>
           {vendor.extras.length === 0 ? (
             <p className="muted">No extras yet.</p>
@@ -398,6 +421,48 @@ function VendorPanel({
             />
             <button type="submit">Add extra</button>
           </form>
+          </div>
+
+          <div>
+          <h3>Discounts</h3>
+          {vendor.discounts.length === 0 ? (
+            <p className="muted">No discounts yet.</p>
+          ) : (
+            <ul className="lines">
+              {vendor.discounts.map((discount) => (
+                <li key={discount.id}>
+                  <span>
+                    <strong>{formatInr(discount.amount)}</strong>
+                    <em>{discount.date}</em>
+                  </span>
+                  <button
+                    type="button"
+                    className="text"
+                    onClick={() =>
+                      void deleteDiscount(vendor.id, discount.id).then(onChange)
+                    }
+                  >
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <form className="inline compact" onSubmit={onAddDiscount}>
+            <input
+              inputMode="decimal"
+              value={discountAmount}
+              onChange={(e) => setDiscountAmount(e.target.value)}
+              placeholder="Amount"
+            />
+            <input
+              type="date"
+              value={discountDate}
+              onChange={(e) => setDiscountDate(e.target.value)}
+            />
+            <button type="submit">Add discount</button>
+          </form>
+          </div>
         </div>
 
         <div>

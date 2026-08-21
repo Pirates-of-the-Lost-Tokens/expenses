@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie'
-import type { Extra, Payment, Vendor } from './types.ts'
+import type { Discount, Extra, Payment, Vendor } from './types.ts'
 
 const db = new Dexie('marriage-expenses') as Dexie & {
   vendors: EntityTable<Vendor, 'id'>
@@ -17,9 +17,18 @@ export function today(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
+function withDefaults(vendor: Vendor): Vendor {
+  return {
+    ...vendor,
+    extras: vendor.extras ?? [],
+    discounts: vendor.discounts ?? [],
+    payments: vendor.payments ?? [],
+  }
+}
+
 export async function listVendors(): Promise<Vendor[]> {
   const vendors = await db.vendors.toArray()
-  return vendors.sort((a, b) => a.name.localeCompare(b.name))
+  return vendors.map(withDefaults).sort((a, b) => a.name.localeCompare(b.name))
 }
 
 export async function addVendor(input: {
@@ -34,6 +43,7 @@ export async function addVendor(input: {
     category: input.category.trim() || 'Other',
     quotedAmount: input.quotedAmount,
     extras: [],
+    discounts: [],
     payments: [],
     notes: '',
   })
@@ -51,11 +61,16 @@ export async function deleteVendor(id: string): Promise<void> {
   await db.vendors.delete(id)
 }
 
+async function getVendor(vendorId: string): Promise<Vendor | undefined> {
+  const vendor = await db.vendors.get(vendorId)
+  return vendor ? withDefaults(vendor) : undefined
+}
+
 export async function addExtra(
   vendorId: string,
   extra: Omit<Extra, 'id'>,
 ): Promise<void> {
-  const vendor = await db.vendors.get(vendorId)
+  const vendor = await getVendor(vendorId)
   if (!vendor) return
   await db.vendors.update(vendorId, {
     extras: [...vendor.extras, { ...extra, id: newId() }],
@@ -63,10 +78,32 @@ export async function addExtra(
 }
 
 export async function deleteExtra(vendorId: string, extraId: string): Promise<void> {
-  const vendor = await db.vendors.get(vendorId)
+  const vendor = await getVendor(vendorId)
   if (!vendor) return
   await db.vendors.update(vendorId, {
     extras: vendor.extras.filter((extra) => extra.id !== extraId),
+  })
+}
+
+export async function addDiscount(
+  vendorId: string,
+  discount: Omit<Discount, 'id'>,
+): Promise<void> {
+  const vendor = await getVendor(vendorId)
+  if (!vendor) return
+  await db.vendors.update(vendorId, {
+    discounts: [...vendor.discounts, { ...discount, id: newId() }],
+  })
+}
+
+export async function deleteDiscount(
+  vendorId: string,
+  discountId: string,
+): Promise<void> {
+  const vendor = await getVendor(vendorId)
+  if (!vendor) return
+  await db.vendors.update(vendorId, {
+    discounts: vendor.discounts.filter((discount) => discount.id !== discountId),
   })
 }
 
@@ -74,7 +111,7 @@ export async function addPayment(
   vendorId: string,
   payment: Omit<Payment, 'id'>,
 ): Promise<void> {
-  const vendor = await db.vendors.get(vendorId)
+  const vendor = await getVendor(vendorId)
   if (!vendor) return
   await db.vendors.update(vendorId, {
     payments: [...vendor.payments, { ...payment, id: newId() }],
@@ -85,7 +122,7 @@ export async function deletePayment(
   vendorId: string,
   paymentId: string,
 ): Promise<void> {
-  const vendor = await db.vendors.get(vendorId)
+  const vendor = await getVendor(vendorId)
   if (!vendor) return
   await db.vendors.update(vendorId, {
     payments: vendor.payments.filter((payment) => payment.id !== paymentId),

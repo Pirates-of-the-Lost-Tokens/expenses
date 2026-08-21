@@ -19,11 +19,16 @@ function statusFor(paid: number, remaining: number): VendorStatus {
 
 export function totalsFor(vendor: Vendor): VendorTotals {
   const extrasTotal = vendor.extras.reduce((sum, extra) => sum + extra.amount, 0)
+  const discountTotal = vendor.discounts.reduce(
+    (sum, discount) => sum + discount.amount,
+    0,
+  )
   const paid = vendor.payments.reduce((sum, payment) => sum + payment.amount, 0)
-  const finalAmount = vendor.quotedAmount + extrasTotal
+  const finalAmount = vendor.quotedAmount + extrasTotal - discountTotal
   const remaining = finalAmount - paid
   return {
     extrasTotal,
+    discountTotal,
     finalAmount,
     paid,
     remaining,
@@ -36,6 +41,7 @@ export function dashboardTotals(vendors: Vendor[]): Omit<VendorTotals, 'status'>
     (acc, vendor) => {
       const t = totalsFor(vendor)
       acc.extrasTotal += t.extrasTotal
+      acc.discountTotal += t.discountTotal
       acc.finalAmount += t.finalAmount
       acc.paid += t.paid
       acc.remaining += t.remaining
@@ -43,6 +49,7 @@ export function dashboardTotals(vendors: Vendor[]): Omit<VendorTotals, 'status'>
     },
     {
       extrasTotal: 0,
+      discountTotal: 0,
       finalAmount: 0,
       paid: 0,
       remaining: 0,

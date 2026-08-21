@@ -12,12 +12,20 @@ export type Payment = {
   note: string
 }
 
+export type Discount = {
+  id: string
+  amount: number
+  date: string
+  description?: string
+}
+
 export type Vendor = {
   id: string
   name: string
   category: string
   quotedAmount: number
   extras: Extra[]
+  discounts: Discount[]
   payments: Payment[]
   notes: string
 }
@@ -26,6 +34,7 @@ export type VendorStatus = 'unpaid' | 'partial' | 'settled' | 'overpaid'
 
 export type VendorTotals = {
   extrasTotal: number
+  discountTotal: number
   finalAmount: number
   paid: number
   remaining: number
