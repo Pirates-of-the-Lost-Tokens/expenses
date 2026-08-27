@@ -164,6 +164,7 @@ export default function App() {
         text: `Loaded ${result.vendors} vendors and ${result.receipts} receipts.`,
         ok: true,
       })
+      setTab('expenses')
       await reload()
     } catch (err) {
       setBackupMessage({
@@ -186,11 +187,33 @@ export default function App() {
   return (
     <div className="page">
       <header className="masthead">
-        <p className="eyebrow">Household ledger</p>
-        <h1>Marriage expenses</h1>
-        <p className="lede">
-          Vendors and funds stay in this browser. Nothing is sent anywhere.
-        </p>
+        <div className="masthead-row">
+          <div>
+            <p className="eyebrow">Household ledger</p>
+            <h1>Marriage expenses</h1>
+            <p className="lede">
+              Vendors and funds stay in this browser. Nothing is sent anywhere.
+            </p>
+          </div>
+          <div className="masthead-actions">
+            <button
+              type="button"
+              className="load-backup"
+              onClick={() => backupInputRef.current?.click()}
+            >
+              Load from backup
+            </button>
+          </div>
+        </div>
+        {backupMessage ? (
+          <p
+            className={
+              backupMessage.ok ? 'backup-banner ok' : 'backup-banner error'
+            }
+          >
+            {backupMessage.text}
+          </p>
+        ) : null}
       </header>
 
       <nav className="tabs" aria-label="Views">
@@ -216,6 +239,26 @@ export default function App() {
           Backup
         </button>
       </nav>
+
+      <div className="backup-toolbar">
+        <input
+          ref={backupInputRef}
+          type="file"
+          accept="application/json,.json"
+          hidden
+          onChange={(e) => void onRestoreBackup(e)}
+        />
+        <button
+          type="button"
+          className="load-backup"
+          onClick={() => backupInputRef.current?.click()}
+        >
+          Load from backup
+        </button>
+        <span className="backup-toolbar-hint">
+          Upload your .json file to restore vendors and funds
+        </span>
+      </div>
 
       {tab === 'expenses' ? (
         <>
@@ -407,22 +450,16 @@ export default function App() {
         <section className="backup-panel" aria-label="Backup">
           <h2>Restore from JSON</h2>
           <p className="muted backup-hint">
-            Pick the <strong>.json</strong> file you downloaded earlier. It
-            replaces all vendors and funds in this browser.
+            Pick your <strong>.json</strong> backup file. Same as the header
+            button — replaces all vendors and funds in this browser.
           </p>
-          <input
-            ref={backupInputRef}
-            type="file"
-            accept="application/json,.json"
-            hidden
-            onChange={(e) => void onRestoreBackup(e)}
-          />
           <div className="backup-actions">
             <button
               type="button"
+              className="load-backup"
               onClick={() => backupInputRef.current?.click()}
             >
-              Upload JSON backup
+              Load from backup
             </button>
             <button
               type="button"
