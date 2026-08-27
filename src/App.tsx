@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import {
   addDiscount,
   addExtra,
@@ -10,6 +10,8 @@ import {
   deletePayment,
   deleteReceipt,
   deleteVendor,
+  exportBackup,
+  importBackup,
   listReceipts,
   listVendors,
   today,
@@ -45,7 +47,7 @@ const statusLabel: Record<VendorStatus, string> = {
 }
 
 export default function App() {
-  const [tab, setTab] = useState<'expenses' | 'funds'>('expenses')
+  const [tab, setTab] = useState<'expenses' | 'funds' | 'backup'>('expenses')
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [receipts, setReceipts] = useState<Receipt[]>([])
   const [openId, setOpenId] = useState<string | null>(null)
@@ -59,6 +61,11 @@ export default function App() {
   const [fundAmount, setFundAmount] = useState('')
   const [fundDate, setFundDate] = useState(today())
   const [fundNote, setFundNote] = useState('')
+  const [backupMessage, setBackupMessage] = useState<{
+    text: string
+    ok: boolean
+  } | null>(null)
+  const backupInputRef = useRef<HTMLInputElement>(null)
 
   const reload = useCallback(async () => {
     const [nextVendors, nextReceipts] = await Promise.all([
@@ -115,6 +122,57 @@ export default function App() {
     await reload()
   }
 
+  async function onDownloadBackup() {
+    const backup = await exportBackup()
+    const blob = new Blob([JSON.stringify(backup, null, 2)], {
+      type: 'application/json',
+    })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `marriage-expenses-${today()}.json`
+    anchor.click()
+    URL.revokeObjectURL(url)
+    setBackupMessage({
+      text: `Downloaded ${backup.vendors.length} vendors and ${backup.receipts.length} receipts.`,
+      ok: true,
+    })
+  }
+
+  async function onRestoreBackup(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+
+    const hasData = vendors.length > 0 || receipts.length > 0
+    if (
+      hasData &&
+      !window.confirm(
+        'This replaces all vendors and funds in this browser with the backup. Continue?',
+      )
+    ) {
+      return
+    }
+
+    try {
+      const text = await file.text()
+      const parsed: unknown = JSON.parse(text)
+      const result = await importBackup(parsed)
+      setOpenId(null)
+      setError(null)
+      setBackupMessage({
+        text: `Loaded ${result.vendors} vendors and ${result.receipts} receipts.`,
+        ok: true,
+      })
+      await reload()
+    } catch (err) {
+      setBackupMessage({
+        text: err instanceof Error ? err.message : 'Could not load backup file.',
+        ok: false,
+      })
+    }
+  }
+
   const dash = dashboardTotals(vendors)
   const quotedSum = quotedTotal(vendors)
   const received = receivedTotal(receipts)
@@ -149,6 +207,13 @@ export default function App() {
           onClick={() => setTab('funds')}
         >
           Funds
+        </button>
+        <button
+          type="button"
+          className={tab === 'backup' ? 'tab active' : 'tab'}
+          onClick={() => setTab('backup')}
+        >
+          Backup
         </button>
       </nav>
 
@@ -283,7 +348,7 @@ export default function App() {
             />
           ) : null}
         </>
-      ) : (
+      ) : tab === 'funds' ? (
         <>
           <section className="summary" aria-label="Funds totals">
             <SummaryTile label="Received" value={formatInr(received)} />
@@ -338,6 +403,49 @@ export default function App() {
             </form>
           </section>
         </>
+      ) : (
+        <section className="backup-panel" aria-label="Backup">
+          <h2>Restore from JSON</h2>
+          <p className="muted backup-hint">
+            Pick the <strong>.json</strong> file you downloaded earlier. It
+            replaces all vendors and funds in this browser.
+          </p>
+          <input
+            ref={backupInputRef}
+            type="file"
+            accept="application/json,.json"
+            hidden
+            onChange={(e) => void onRestoreBackup(e)}
+          />
+          <div className="backup-actions">
+            <button
+              type="button"
+              onClick={() => backupInputRef.current?.click()}
+            >
+              Upload JSON backup
+            </button>
+            <button
+              type="button"
+              className="ghost"
+              onClick={() => void onDownloadBackup()}
+            >
+              Download backup
+            </button>
+          </div>
+          {backupMessage ? (
+            <p
+              className={
+                backupMessage.ok ? 'backup-status' : 'error backup-status'
+              }
+            >
+              {backupMessage.text}
+            </p>
+          ) : null}
+          <p className="muted backup-note">
+            Current data: {vendors.length} vendors, {receipts.length} fund
+            entries.
+          </p>
+        </section>
       )}
     </div>
   )

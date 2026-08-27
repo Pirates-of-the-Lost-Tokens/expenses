@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie'
-import type { Discount, Extra, Payment, Receipt, Vendor } from './types.ts'
+import type { BackupData, Discount, Extra, Payment, Receipt, Vendor } from './types.ts'
 
 const db = new Dexie('marriage-expenses') as Dexie & {
   vendors: EntityTable<Vendor, 'id'>
@@ -173,4 +173,76 @@ export async function updateReceipt(
 
 export async function deleteReceipt(id: string): Promise<void> {
   await db.receipts.delete(id)
+}
+
+function normalizeVendor(raw: unknown): Vendor {
+  if (!raw || typeof raw !== 'object') {
+    throw new Error('Invalid vendor entry in backup.')
+  }
+  const v = raw as Partial<Vendor>
+  if (!v.id || !v.name || typeof v.quotedAmount !== 'number') {
+    throw new Error(`Invalid vendor: ${v.name ?? 'unknown'}`)
+  }
+  return withDefaults({
+    id: String(v.id),
+    name: String(v.name),
+    category: String(v.category ?? 'Other'),
+    quotedAmount: v.quotedAmount,
+    extras: Array.isArray(v.extras) ? v.extras : [],
+    discounts: Array.isArray(v.discounts) ? v.discounts : [],
+    payments: Array.isArray(v.payments) ? v.payments : [],
+    notes: String(v.notes ?? ''),
+  })
+}
+
+function normalizeReceipt(raw: unknown): Receipt {
+  if (!raw || typeof raw !== 'object') {
+    throw new Error('Invalid receipt entry in backup.')
+  }
+  const r = raw as Partial<Receipt>
+  if (!r.id || typeof r.amount !== 'number' || !r.date) {
+    throw new Error('Invalid receipt in backup.')
+  }
+  const note = r.note?.trim()
+  return {
+    id: String(r.id),
+    amount: r.amount,
+    date: String(r.date),
+    ...(note ? { note } : {}),
+  }
+}
+
+export async function exportBackup(): Promise<BackupData> {
+  const [vendors, receipts] = await Promise.all([listVendors(), listReceipts()])
+  return {
+    exportedAt: new Date().toISOString(),
+    vendors,
+    receipts,
+  }
+}
+
+export async function importBackup(data: unknown): Promise<{
+  vendors: number
+  receipts: number
+}> {
+  if (!data || typeof data !== 'object') {
+    throw new Error('Backup file is not valid JSON.')
+  }
+  const backup = data as Partial<BackupData>
+  if (!Array.isArray(backup.vendors)) {
+    throw new Error('Backup must include a vendors array.')
+  }
+  const vendors = backup.vendors.map(normalizeVendor)
+  const receipts = Array.isArray(backup.receipts)
+    ? backup.receipts.map(normalizeReceipt)
+    : []
+
+  await db.transaction('rw', db.vendors, db.receipts, async () => {
+    await db.vendors.clear()
+    await db.receipts.clear()
+    if (vendors.length > 0) await db.vendors.bulkPut(vendors)
+    if (receipts.length > 0) await db.receipts.bulkPut(receipts)
+  })
+
+  return { vendors: vendors.length, receipts: receipts.length }
 }

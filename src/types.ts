@@ -60,3 +60,9 @@ export const CATEGORIES = [
   'Gifts',
   'Other',
 ] as const
+
+export type BackupData = {
+  exportedAt: string
+  vendors: Vendor[]
+  receipts: Receipt[]
+}

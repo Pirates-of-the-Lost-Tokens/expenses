@@ -99,6 +99,82 @@ button {
   margin-bottom: -1px;
 }
 
+.backup-panel {
+  margin-top: 1.2rem;
+  padding: 1.5rem 1.15rem 1.4rem;
+  border: 1px solid var(--line);
+  background: var(--card);
+}
+
+.backup-panel h2 {
+  margin: 0 0 0.5rem;
+  font-family: Fraunces, Georgia, serif;
+  font-weight: 560;
+}
+
+.backup-note {
+  margin: 1rem 0 0;
+  font-size: 0.88rem;
+}
+
+.backup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 1rem 0 1.2rem;
+  padding: 1rem 1.15rem;
+  border: 1px solid var(--line);
+  background: var(--card);
+}
+
+.backup h2 {
+  margin: 0 0 0.35rem;
+  font-family: Fraunces, Georgia, serif;
+  font-size: 1.15rem;
+  font-weight: 560;
+}
+
+.backup-hint {
+  margin: 0;
+  max-width: 28rem;
+}
+
+.backup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+  margin-top: 1rem;
+}
+
+.upload {
+  display: inline-block;
+  padding: 0.62rem 0.95rem;
+  border: 0;
+  background: var(--ink);
+  color: #faf6ee;
+  font-size: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.upload.primary:hover {
+  opacity: 0.92;
+}
+
+.upload input {
+  display: none;
+}
+
+.backup-status {
+  width: 100%;
+  margin: 0;
+  color: var(--sage);
+  font-size: 0.88rem;
+}
+
 .summary {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
