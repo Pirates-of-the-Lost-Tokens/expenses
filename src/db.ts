@@ -156,6 +156,21 @@ export async function addReceipt(input: {
   return id
 }
 
+export async function updateReceipt(
+  id: string,
+  patch: { amount: number; date: string; note?: string },
+): Promise<void> {
+  const existing = await db.receipts.get(id)
+  if (!existing) return
+  const note = patch.note?.trim()
+  await db.receipts.put({
+    id,
+    amount: patch.amount,
+    date: patch.date,
+    ...(note ? { note } : {}),
+  })
+}
+
 export async function deleteReceipt(id: string): Promise<void> {
   await db.receipts.delete(id)
 }

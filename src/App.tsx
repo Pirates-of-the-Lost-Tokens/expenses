@@ -13,6 +13,7 @@ import {
   listReceipts,
   listVendors,
   today,
+  updateReceipt,
   updateVendor,
 } from './db.ts'
 import {
@@ -308,24 +309,11 @@ export default function App() {
             ) : (
               <ul className="lines">
                 {receipts.map((receipt) => (
-                  <li key={receipt.id}>
-                    <span>
-                      <strong>{formatInr(receipt.amount)}</strong>
-                      <em>
-                        {receipt.date}
-                        {receipt.note ? ` · ${receipt.note}` : ''}
-                      </em>
-                    </span>
-                    <button
-                      type="button"
-                      className="text"
-                      onClick={() =>
-                        void deleteReceipt(receipt.id).then(reload)
-                      }
-                    >
-                      Remove
-                    </button>
-                  </li>
+                  <ReceiptRow
+                    key={receipt.id}
+                    receipt={receipt}
+                    onChange={reload}
+                  />
                 ))}
               </ul>
             )}
@@ -379,6 +367,99 @@ function SummaryTile({
       <span className="tile-label">{label}</span>
       <span className="tile-value">{value}</span>
     </div>
+  )
+}
+
+function ReceiptRow({
+  receipt,
+  onChange,
+}: {
+  receipt: Receipt
+  onChange: () => Promise<void>
+}) {
+  const [editing, setEditing] = useState(false)
+  const [amount, setAmount] = useState(String(receipt.amount))
+  const [date, setDate] = useState(receipt.date)
+  const [note, setNote] = useState(receipt.note ?? '')
+
+  function startEdit() {
+    setAmount(String(receipt.amount))
+    setDate(receipt.date)
+    setNote(receipt.note ?? '')
+    setEditing(true)
+  }
+
+  async function saveEdit(event: FormEvent) {
+    event.preventDefault()
+    const nextAmount = parseAmount(amount)
+    if (nextAmount <= 0) return
+    await updateReceipt(receipt.id, {
+      amount: nextAmount,
+      date,
+      note: note.trim() || undefined,
+    })
+    setEditing(false)
+    await onChange()
+  }
+
+  if (editing) {
+    return (
+      <li className="line-edit">
+        <form className="inline compact funds-edit" onSubmit={saveEdit}>
+          <input
+            inputMode="decimal"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="Amount (₹)"
+            aria-label="Amount"
+          />
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            aria-label="Date"
+          />
+          <input
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Source (optional)"
+            aria-label="Source"
+          />
+          <button type="submit">Save</button>
+          <button
+            type="button"
+            className="ghost"
+            onClick={() => setEditing(false)}
+          >
+            Cancel
+          </button>
+        </form>
+      </li>
+    )
+  }
+
+  return (
+    <li>
+      <span>
+        <strong>{formatInr(receipt.amount)}</strong>
+        <em>
+          {receipt.date}
+          {receipt.note ? ` · ${receipt.note}` : ''}
+        </em>
+      </span>
+      <span className="row-actions">
+        <button type="button" className="text" onClick={startEdit}>
+          Edit
+        </button>
+        <button
+          type="button"
+          className="text"
+          onClick={() => void deleteReceipt(receipt.id).then(onChange)}
+        >
+          Remove
+        </button>
+      </span>
+    </li>
   )
 }
 
